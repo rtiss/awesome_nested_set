@@ -104,6 +104,7 @@ module CollectiveIdea #:nodoc:
 
       module Model
         extend ActiveSupport::Concern
+        RE_ORACLE_ADAPTER = /[Oo]racle/
 
         included do
           delegate :quoted_table_name, :to => self
@@ -540,8 +541,18 @@ module CollectiveIdea #:nodoc:
 
         # on creation, set automatically lft and rgt to the end of the tree
         def set_default_left_and_right
-          highest_right_row = nested_set_scope(:order => "#{quoted_right_column_full_name} desc").limit(1).lock(true).first
-          maxright = highest_right_row ? (highest_right_row[right_column_name] || 0) : 0
+          unless ActiveRecord::Base.connection.instance_values["config"][:adapter].match(RE_ORACLE_ADAPTER).nil?
+            right_rows_ordered = nested_set_scope(:order => "#{quoted_right_column_full_name} desc").limit(1).to_a
+            if right_rows_ordered.length > 0
+              highest_right_row = right_rows_ordered.first.lock!
+              maxright = highest_right_row[right_column_name] || 0
+            else
+              maxright = 0
+            end
+          else
+            highest_right_row = nested_set_scope(:order => "#{quoted_right_column_full_name} desc").limit(1).lock(true).first
+            maxright = highest_right_row ? (highest_right_row[right_column_name] || 0) : 0
+          end
           # adds the new node to the right of all existing nodes
           self[left_column_name] = maxright + 1
           self[right_column_name] = maxright + 2
