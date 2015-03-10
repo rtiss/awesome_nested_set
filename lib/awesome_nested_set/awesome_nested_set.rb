@@ -542,7 +542,9 @@ module CollectiveIdea #:nodoc:
         # on creation, set automatically lft and rgt to the end of the tree
         def set_default_left_and_right
           unless ActiveRecord::Base.connection.instance_values["config"][:adapter].match(RE_ORACLE_ADAPTER).nil?
-            highest_right_row = nested_set_scope(:order => "#{quoted_right_column_full_name} desc").lock(true).to_a.first
+            highest_right_row = nested_set_scope(:conditions => ["id = ?",
+                                                                 nested_set_scope(:order => "#{quoted_right_column_full_name} desc").limit(1).to_a.first.id]
+            ).lock(true).to_a.first
           else
             highest_right_row = nested_set_scope(:order => "#{quoted_right_column_full_name} desc").limit(1).lock(true).first
           end
